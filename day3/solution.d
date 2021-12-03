@@ -7,13 +7,12 @@ import std.conv;
 import std.algorithm;
 import std.array;
 
-char selectedBit(const string bits, bool takeHighest, char tieBreaker = '1') {
+char compareOnes(string opCmp)(const string bits) {
 	size_t ones = bits.count!(s => s == '1');
 	size_t zeroes = bits.length - ones;
-	if (ones == zeroes) return tieBreaker;
-	return ((ones > zeroes) == takeHighest) ? '1' : '0';
+	return (mixin("ones" ~ opCmp ~ "zeroes")) ? '1' : '0';
 }
-alias BitSelectorFunc = char delegate(const string);
+alias BitSelectorFunc = char function(const string);
 
 int part1Rating(const string[] data, BitSelectorFunc selectBit) {
 	string result = "";
@@ -25,8 +24,8 @@ int part1Rating(const string[] data, BitSelectorFunc selectBit) {
 }
 
 int part1(const string[] data) {
-	int gamma = part1Rating(data, (bits) => selectedBit(bits, true));
-	int epsilon = part1Rating(data, (bits) => selectedBit(bits, false));
+	int gamma = part1Rating(data, &compareOnes!">");
+	int epsilon = part1Rating(data, &compareOnes!"<");
 	return gamma * epsilon;
 }
 
@@ -44,8 +43,8 @@ int part2Rating(const string[] original, BitSelectorFunc selectBit) {
 }
 
 int part2(const string[] original) {
-	int oxygen = part2Rating(original, (bits) => selectedBit(bits, true, '1'));
-	int co2 = part2Rating(original, (bits) => selectedBit(bits, false, '0'));
+	int oxygen = part2Rating(original, &compareOnes!">=");
+	int co2 = part2Rating(original, &compareOnes!"<");
 	return co2 * oxygen;
 }
 
