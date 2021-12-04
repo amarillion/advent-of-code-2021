@@ -1,4 +1,4 @@
-#!/usr/bin/env -S rdmd -unittest -I..
+#!/usr/bin/env -S rdmd -I..
 
 import common.io;
 import std.stdio;
@@ -7,6 +7,10 @@ import std.conv;
 import std.algorithm;
 import std.array;
 
+struct Command {
+	string direction;
+	int amount;
+}
 
 int part1(Command[] commands) {
 	int x = 0;
@@ -46,13 +50,12 @@ Command[] parseLines(string[] lines) {
 	return result;
 }
 
-struct Command {
-	string direction;
-	int amount;
+int[] solve(string fname) {
+	Command[] commands = parseLines(readLines(fname));
+	return [ part1(commands), part2(commands) ];
 }
 
 void main() {
-	Command[] commands = parseLines(readLines("input"));
-	writeln(part1(commands));
-	writeln(part2(commands));
+	assert(solve("test") == [150, 900]);
+	writeln(solve("input"));
 }
