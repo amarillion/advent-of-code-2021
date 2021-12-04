@@ -48,8 +48,12 @@ int part2(const string[] original) {
 	return co2 * oxygen;
 }
 
+auto run(string fname) {	
+	string[] data = readLines(fname);
+	return [ part1(data), part2(data) ];
+}
+
 void main() {	
-	string[] data = readLines("input");
-	writeln(part1(data));
-	writeln(part2(data));
+	assert(run("test") == [198, 230]);
+	writeln(run("input"));
 }
