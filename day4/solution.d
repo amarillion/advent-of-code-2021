@@ -59,17 +59,20 @@ void main() {
 			}
 
 			if (found) {
-				break;
+				writeln("Winning board: ", winningBoard);
+				int totalSum = winningBoard.map!(row => row.sum()).sum();
+
+				writeln(totalSum, " ", number, " ", totalSum * number);
+				
+				boards = boards.filter!(b => b != winningBoard).array;
+				writeln("Remaining: ", boards.length);
 			}
 		}
 
-		if (found) {
-			writeln("Winning board: ", winningBoard);
-			int totalSum = winningBoard.map!(row => row.sum()).sum();
+		// if (boards.length == 1) {
+		// 	break;
+		// }
 
-			writeln(totalSum, " ", number, " ", totalSum * number);
-			break;
-		}
 	}
 
 
