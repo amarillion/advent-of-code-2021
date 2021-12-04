@@ -1,4 +1,5 @@
-#!/usr/bin/env -S rdmd -unittest -I..
+#!/usr/bin/env -S rdmd -I..
+module day1.alt;
 
 import common.io;
 import std.stdio;
@@ -6,35 +7,26 @@ import std.string;
 import std.conv;
 import std.algorithm;
 import std.array;
+import std.range;
 
-int countIncreases(const int[] data) {
-	int result = 0;
-	int prev = data[0];
-	foreach(int i; data[1..$]) {
-		if (i > prev) { result++; }
-		prev = i;
-	}
-	return result;
+size_t countIncreases(const int[] data) {
+	return data.slide(2).count!(a => a[1] > a[0]);
 }
 
-int[] slidingWindow(const int[] data) {
-	int[] result = [];
-	for (int i = 1; i + 1 < data.length; ++i) {
-		result ~= data[i-1] + data[i] + data[i+1];
-	}
-	return result;
+int[] sumThrees(const int[] data) {
+	return data.slide(3).map!(sum).array;
+}
+
+auto solve(string fname) {
+	int[] data = readLines(fname).map!(to!int).array;
+	
+	return [
+		countIncreases(data),
+		countIncreases(sumThrees(data))
+	];
 }
 
 void main() {
-	int[] data = readLines("input").map!(to!int).array;
-
-	writeln(countIncreases(data));
-	writeln(countIncreases(slidingWindow(data)));
-}
-
-unittest {
-	const testData = [ 199, 200, 208, 210, 200, 207, 240, 269, 260, 263 ];
-	assert(countIncreases(testData) == 7);
-	assert(slidingWindow(testData) == [ 607, 618, 618, 617, 647, 716, 769, 792 ]);
-	assert(countIncreases(slidingWindow(testData)) == 5);
+	assert(solve("test") == [ 7, 5 ]);
+	writeln(solve("input"));
 }
