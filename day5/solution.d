@@ -17,49 +17,49 @@ struct Line {
 	Point b;
 }
 
-auto solve (string fname) {	
-	string[] data = readLines(fname);
-	Line[] lines = [];
+bool isOrthogonal(Line l) { return l.a.x == l.b.x || l.a.y == l.b.y; }
 
-	foreach(string d; data) {
-		string[] fields = d.split(" -> ").array;
-		Line line;
-		int[] values = fields[0].split(",").map!(to!int).array;
-		line.a = Point(values[0], values[1]);
-		values = fields[1].split(",").map!(to!int).array;
-		line.b = Point(values[0], values[1]);
-		lines ~= line;
-	}
-	
+Point kingsMove(Line line) {
+	Point delta = line.b - line.a;
+	return Point(sgn(delta.x), sgn(delta.y));
+}
+
+size_t countCrosspoints(Line[] lines) {
 	auto grid = new SparseInfiniteGrid!(Point, int)();
-
 	foreach (Line line; lines) {
 		Point pos = line.a;
-		Point delta = line.b - line.a;
-		
-		// if (delta.x != 0 && delta.y != 0) continue; // only consider horizontal / vertical
+		Point delta = kingsMove(line);
 
-		if (delta.x != 0) delta.x = delta.x / abs(delta.x);
-		if (delta.y != 0) delta.y = delta.y / abs(delta.y);		
-		
 		grid.set(pos, grid.get(pos) + 1);
 		while (pos != line.b) {
 			pos = pos + delta;
 			grid.set(pos, grid.get(pos) + 1);
 		}
 	}
+	return PointRange(grid.min, grid.max + 1).count!(pos => grid.get(pos) >= 2);
+}
+
+Point parsePoint(string s) {
+	int[] values = s.split(",").map!(to!int).array;
+	return Point(values[0], values[1]);
+}
 	
-	int count = 0;
-	foreach (Point pos; PointRange(grid.min, grid.max + 1)) {
-		if (grid.get(pos) >= 2) {
-			count++;
-		}
+auto solve (string fname) {	
+	string[] data = readLines(fname);
+	Line[] lines = [];
+
+	foreach(string d; data) {
+		string[] fields = d.split(" -> ").array;
+		lines ~= Line(parsePoint(fields[0]), parsePoint(fields[1]));
 	}
-	// writeln(grid);
-	return [ count ];
+
+	return [
+		countCrosspoints(lines.filter!isOrthogonal.array),
+		countCrosspoints(lines)
+	];
 }
 
 void main() {
-	assert (solve("test") == [ /* 5 */ 12 ]);
+	assert (solve("test") == [ 5, 12 ]);
 	writeln (solve("input"));
 }
