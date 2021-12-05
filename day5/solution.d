@@ -1,8 +1,9 @@
 #!/usr/bin/env -S rdmd -I..
 
 import common.io;
-import common.grid;
+import common.sparsegrid;
 import common.vec;
+import common.coordrange;
 import std.stdio;
 import std.conv;
 import std.algorithm;
