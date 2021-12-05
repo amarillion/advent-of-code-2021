@@ -37,7 +37,7 @@ auto solve (string fname) {
 		Point pos = line.a;
 		Point delta = line.b - line.a;
 		
-		if (delta.x != 0 && delta.y != 0) continue; // only consider horizontal / vertical
+		// if (delta.x != 0 && delta.y != 0) continue; // only consider horizontal / vertical
 
 		if (delta.x != 0) delta.x = delta.x / abs(delta.x);
 		if (delta.y != 0) delta.y = delta.y / abs(delta.y);		
@@ -55,10 +55,11 @@ auto solve (string fname) {
 			count++;
 		}
 	}
+	// writeln(grid);
 	return [ count ];
 }
 
 void main() {
-	assert (solve("test") == [ 5 ]);
+	assert (solve("test") == [ /* 5 */ 12 ]);
 	writeln (solve("input"));
 }
