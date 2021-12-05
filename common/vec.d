@@ -86,7 +86,19 @@ struct vec(int N, V) {
 		return result;
 	}
 
-	string toString() {
+	/** 
+	Applies std.math.sgn to each element in the vector. For example, vec3i(5, 0, -10) becomes vec3i(1, 0, -1)
+	*/ 
+	vec!(N, V) sgn() const {
+		import std.math;
+		vec!(N, V) result;
+		foreach(i; 0..N) {
+			result.val[i] = val[i].sgn;
+		}
+		return result;
+	}
+
+	string toString() const {
 		bool first = true;
 		char[] result = ['['];
 		foreach(i; val) {
@@ -105,7 +117,6 @@ alias vec2i = vec!(2, int);
 alias Point = vec!(2, int);
 alias vec3i = vec!(3, int);
 alias vec4i = vec!(4, int);
-
 
 struct CoordRange(T) {
 	
@@ -170,4 +181,51 @@ struct Walk(T) {
 	bool empty() const {
 		return remain <= 0;
 	}
+}
+
+/** 
+ * Walk from A to B in integral increments,
+ * preferring diagonal steps if possible.
+ *
+ *
+ * For example:
+ * 
+ *   A
+ *    \
+ *     \
+ *      \---B
+ */
+struct DiagonalWalker {
+	Point pos;
+	Point end;
+	bool done;
+
+	this(Point start, Point end) {
+		pos = start;
+		this.end = end;
+		done = false;
+	}
+
+	Point front() {
+		return pos;
+	}
+
+	void popFront() {
+		if (pos == end) { done = true; }
+		pos = pos + (end - pos).sgn;
+	}
+
+	bool empty() const {
+		return done;
+	}
+}
+
+unittest {
+	assert(
+			DiagonalWalker(Point(0, 0), Point(1, 1)).array 
+			== [Point(0, 0), Point(1, 1)]
+	);
+	assert(DiagonalWalker(Point(0, 0), Point(-2, 0)).array 
+			== [Point(0, 0), Point(-1, 0), Point(-2, 0)]
+	);
 }

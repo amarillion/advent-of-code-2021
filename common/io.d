@@ -8,7 +8,7 @@ string[] readLines(string fname) {
 	string[] result = [];
 	while (!file.eof()) {
 		string line = chomp(file.readln()); 
-		result = result ~ line;
+		result ~= line;
 	}
 	// Remove empty line...
 	if (result[$-1].length == 0) { result = result[0..$-1]; }

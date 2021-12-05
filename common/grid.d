@@ -30,6 +30,10 @@ class SparseInfiniteGrid(T, U) {
 		}
 	}
 
+	void modify(T p, U delegate(U) modifier) {
+		set(p, modifier(get(p)));
+	}
+
 	string format(string cellSep = ", ", string lineSep = "\n", string blockSep = "\n\n") {
 		char[] result;
 		int i = 0;
