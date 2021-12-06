@@ -13,14 +13,13 @@ alias State = ulong[int];
 
 State simulateDay(const State state) {
 	ulong[int] result;
-
-	if (0 in state) {
-		result[6] += state[0];
-		result[8] += state[0];
-	}
-	for (int i = 1; i <= 8; ++i) {
-		if (i in state) {
-			result[i-1] += state[i];
+	foreach(key, value; state) {
+		if (key == 0) {
+			result[6] += value;
+			result[8] += value;
+		}
+		else {
+			result[key - 1] += value;
 		}
 	}
 	return result;
@@ -31,25 +30,20 @@ ulong simulate(const int[] initialState, int days) {
 	foreach(fish; initialState) {
 		state[fish]++;
 	}
-	writeln(state);
 
 	for (int i = 0; i < days; ++i) {
 		state = simulateDay(state);
-		writefln("After %s days: %s", i+1, state.values.sum);
-		writeln(state.values);
 	}
-
 	return state.values.sum;
 }
 
 auto solve (string fname) {
 	string line = readLines(fname)[0];
-	int[] state = line.split(",").map!(to!int).array;
-
+	int[] initialState = line.split(",").map!(to!int).array;
 
 	return [
-		simulate(state, 80),
-		simulate(state, 256)
+		simulate(initialState, 80),
+		simulate(initialState, 256)
 	];
 }
 
