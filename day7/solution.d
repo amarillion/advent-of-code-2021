@@ -32,16 +32,9 @@ auto solve (string fname) {
 	string line = readLines(fname)[0];
 	int[] positions = line.split(",").map!(to!int).array;
 
-	int[] fuelCosts;
-	int prev = 0;
-	for (int i = 0; i <= positions.maxElement; ++i) {
-		prev += i; 
-		fuelCosts ~= prev;
-	}
-
 	return [
 		optimalLevel(positions),
-		optimalLevel(positions, i => fuelCosts[i]),
+		optimalLevel(positions, i => (i * (i + 1)) / 2),
 	];
 }
 
