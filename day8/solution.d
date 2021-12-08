@@ -11,19 +11,20 @@ import std.concurrency;
 import std.math;
 import std.ascii;
 
+string sortString(string str) {
+	dchar[] buffer = to!(dchar[])(str); 
+	sort(buffer); 
+	return to!string(buffer);
+}
+
 auto countSimple(string[] lines) {
 	int count = 0;
 	foreach(line; lines) {
 		string[] parts = line.split(" | ");
 		writeln(parts);
-		string[] samples = parts[0].split;
 		string[] outputs = parts[1].split;
-
 		foreach (output; outputs) {
-			switch(output.length) {
-				case 2: case 4: case 3: case 7: count++; break;
-				default: /* ignore */ break;
-			}
+			if ([2, 3, 4, 7].canFind(output.length)) { count++; }
 		}
 	}
 	return count;
@@ -34,12 +35,14 @@ auto deduce(string[] lines) {
 	foreach(line; lines) {
 		string[] parts = line.split(" | ");
 		writeln(parts);
-		string[] samples = parts[0].split;
-		string[] outputs = parts[1].split;
+	
+		// strings must be sorted for set difference / intersection algorithms to work.
+		string[] samples = parts[0].split.map!(sortString).array;
+		string[] outputs = parts[1].split.map!(sortString).array;
 
 		// at this point, each letter can mean everything still
-		bool[char] initial = [ 'a': true, 'b': true, 'c': true, 'd': true, 'e': true, 'f': true, 'g': true ];
-		bool[char][char] deduction = [
+		dchar[] initial = to!(dchar[])("abcdefg");
+		dchar[][dchar] deduction = [
 			'a': initial.dup,
 			'b': initial.dup,
 			'c': initial.dup,
@@ -49,39 +52,39 @@ auto deduce(string[] lines) {
 			'g': initial.dup,
 		];
 
-		void guess(string observed, string expected) {
-			// observed lowercase, expected uppercase
-			foreach (char e; "abcdefg") {
-				
-				bool mustBeThere = !expected.canFind(e);
+		void restrictOptions(string observed, string expected) {
+			// if a letter is in expected, then all other letters are removed as option.
+			foreach (dchar e; expected) {
+				deduction[e] = setIntersection(deduction[e], observed).array;
+			}
+			
+			// if a letter is not in expected, then observed letters are removed as option.
+			dchar[] notInExpected = setDifference("abcdefg", expected).array;
+			foreach (dchar e; notInExpected) {
+				deduction[e] = setDifference(deduction[e], observed).array;
+			}
 
-				foreach(k, ref v; deduction[e]) {
-					if (observed.canFind(k) == mustBeThere) {
-						if (v) v = false;
-					}
-				}	
+			writeln(observed);
+			foreach(k, v; deduction) {
+				writeln (k, " is (one of) ", v);
 			}
 		}
 
-		void guess2(string observed, string[] expected) {
-			string missing = "";
-			bool[char] missingExpected;
-			foreach(i; "abcdefg") {
-				if (!observed.canFind(i)) {
-					missing ~= i;
-				}
-			}
+		void guess(string observed, string[] expected) {
+			dchar[] notInObserved  = setDifference("abcdefg", observed).array;
 
-			foreach(m; missing) {
+			bool[dchar] missingExpected;
+			foreach(m; notInObserved) {
 				foreach(k, v; deduction) {
-					if (v[m]) {
+					if (v.canFind(m)) {
 						missingExpected[k] = true;
 					}
 				}
 			}
+
 			// map missing to possibilities
 			
-			// which real segment of cagedb is not fully covered?
+			// which real segment is not fully covered?
 			// see if any of expected can fit
 			int foundCount = 0;
 			string foundMatch;
@@ -100,52 +103,34 @@ auto deduce(string[] lines) {
 				writeln("Trying ", observed, " as ", foundMatch, " results in ", missingExpected);
 				// now eliminate this guess
 
-				guess(observed, foundMatch);
+				restrictOptions(observed, foundMatch);
 			}
 		}
 
+		// first, restrict options using digits that are identifiable by length
 		foreach (sample; samples) {
 			switch(sample.length) {
-				case 2: guess(sample, "cf"); break;
-				case 4: guess(sample, "bcdf"); break;
-				case 3: guess(sample, "acf"); break;
+				case 2: restrictOptions(sample, "cf"); break;
+				case 4: restrictOptions(sample, "bcdf"); break;
+				case 3: restrictOptions(sample, "acf"); break;
 				// case 7: guess(sample, "abcdefg"); break; // not so useful here
 				default: /* ignore */ break;
 			}
-
-			writeln(sample);
-			foreach(k, v; deduction) {
-				string d = "";
-				foreach(a, b; v) {
-					if (b) d ~= a;
-				}
-				writeln (k, " ", d);
-			}
 		}
 
+		// now, break ties using the remaining digits.
 		foreach (sample; samples) {
 			switch(sample.length) {
-				case 5: guess2(sample, ["acdeg", "abdfg", "acdfg"]); break;
-				case 6: guess2(sample, ["abcdfg", "abdefg", "abcefg"]); break;
+				case 5: guess(sample, ["acdeg", "abdfg", "acdfg"]); break;
+				case 6: guess(sample, ["abcdfg", "abdefg", "abcefg"]); break;
 				default: /* ignore */ break;
-			}
-
-			writeln(sample);
-			foreach(k, v; deduction) {
-				string d = "";
-				foreach(a, b; v) {
-					if (b) d ~= a;
-				}
-				writeln (k, " ", d);
 			}
 		}
 
 		// now deduce a singular mapping
-		char[char] finalMapping;
+		dchar[dchar] finalMapping;
 		foreach(k, v; deduction) {
-			foreach(a, b; v) {
-				if (b) finalMapping[a] = k;
-			}
+			finalMapping[v[0]] = k;
 		}
 		
 		int[string] toDigit = [
@@ -163,12 +148,11 @@ auto deduce(string[] lines) {
 
 		int result = 0;
 		foreach (output; outputs) {
-			dchar[] converted = output.map!(x => dchar(finalMapping[to!char(x)])).array;
+			dchar[] converted = output.map!(x => finalMapping[x]).array;
 			sort(converted);
 			writeln(output, " -> ", converted, " -> ", toDigit[to!string(converted)]);
 			result *= 10;
 			result += toDigit[to!string(converted)];
-			
 		}
 		count += result;
 	}
@@ -177,15 +161,13 @@ auto deduce(string[] lines) {
 
 auto solve (string fname) {
 	string[] lines = readLines(fname);
-
-	int count = countSimple(lines);
-
 	return [
-		count, deduce(lines)
+		countSimple(lines), deduce(lines)
 	];
 }
 
 void main() {
+	// writeln (solve("test2"));
 	assert (solve("test") == [ 26, 61229 ]);
 	writeln (solve("input"));
 }
