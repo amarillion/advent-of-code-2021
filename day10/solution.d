@@ -4,48 +4,46 @@ import common.io;
 import std.stdio;
 import std.conv;
 import std.algorithm;
-import std.array;
-import std.concurrency;
-import std.math;
+import std.range;
 
 struct ParseResult {
 	bool error;
 	dchar unexpected;
 	dchar[] stack;
+
+	static ParseResult ok(dchar[] stack) { return ParseResult(false, '\0', stack); }
+	static ParseResult foundUnexpected(dchar unexpected) { return ParseResult(true, unexpected, []); }
 }
+
+dchar[] OPEN_PARENS = ['[', '(', '<', '{'];
+dchar[] CLOSE_PARENS = [']', ')', '>', '}'];
+enum dchar[dchar] MATCHING_PAREN = ['[': ']', '(': ')', '<': '>', '{': '}'];
 
 ParseResult parseLine(string input) {
 	dchar[] stack;
 	dchar[] line = to!(dchar[])(input);
 
-	bool expect(dchar ch) {
-		if (stack.back == ch) {
-			stack.popBack();
-			return true;
-		}
-		return false;
-	}
-
 	while (!line.empty) {
 		dchar ch = line[0];
 		line.popFront;
-		switch(ch) {
-			case '{': stack ~= '}'; break;
-			case '<': stack ~= '>'; break;
-			case '[': stack ~= ']'; break;
-			case '(': stack ~= ')'; break;
-			case '}': case '>': case ')': case ']':
-				if (!expect(ch)) return ParseResult(true, ch, stack); 
-				break;
-			default: assert(0);
+
+		if (OPEN_PARENS.canFind(ch)) {
+			stack ~= MATCHING_PAREN[ch];
+		}
+		else {
+			if (stack.back == ch) {
+				stack.popBack();
+			}
+			else {
+				return ParseResult.foundUnexpected(ch);
+			}
 		}
 	}
 
-	// ok!
-	return ParseResult(false, '\0', stack);
+	return ParseResult.ok(stack);
 }
 
-int part1(ParseResult result) {
+int scoreUnexpectedChar(ParseResult result) {
 	int[dchar] scores = [
 		')': 3,
 		']': 57,
@@ -55,7 +53,7 @@ int part1(ParseResult result) {
 	return scores[result.unexpected];
 }
 
-ulong part2(ParseResult data) {
+ulong scoreRemainingStack(ParseResult data) {
 	int[dchar] scores = [
 		')': 1,
 		']': 2,
@@ -79,13 +77,12 @@ auto solve (string fname) {
 	foreach(line; lines) {
 		auto result = parseLine(line);
 		if (result.error) {
-			count += part1(result);	
+			count += scoreUnexpectedChar(result);
 		}
 		else {
-			scores ~= part2(result);
+			scores ~= scoreRemainingStack(result);
 		}
 	}
-
 	sort (scores);
 
 	return [
@@ -95,7 +92,6 @@ auto solve (string fname) {
 }
 
 void main() {
-	// too low: 462448347
 	assert (solve("test") == [ 26397, 288957 ]);
 	writeln (solve("input"));
 }
