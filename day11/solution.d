@@ -65,19 +65,23 @@ auto solve (string fname) {
 	}
 
 	int flashes = 0;
-	for (int i = 0; i < 100; ++i) {
-		
-		// writeln("Step: ", i);
-		// writeln(grid);
+	int i = 0;
+	for (; i < 100; ++i) {
 		flashes += step(grid);
 	}
-
+	int flashCount = 0;
+	while (flashCount != grid.size.x * grid.size.y) {
+		flashCount = step(grid);
+		i++;
+	}
+	
 	return [
-		flashes
+		flashes,
+		i
 	];
 }
 
 void main() {
-	assert (solve("test") == [ 1656 ]);
+	assert (solve("test") == [ 1656, 195 ]);
 	writeln (solve("input"));
 }
