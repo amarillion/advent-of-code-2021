@@ -8,25 +8,33 @@ import std.algorithm;
 import std.array;
 import std.concurrency;
 import std.math;
-import std.ascii;
+import std.range;
 import common.grid;
 import common.coordrange;
 
-Point[] adjacents = [
-	Point(0, 1), Point(1, 0), Point(0, -1), Point(-1, 0),
-	Point(1, 1), Point(1, -1), Point(-1, 1), Point(-1, -1)
-];
+auto validDiagonals(T)(const Grid!T grid, const Point pos) {
+	Point[] diagonals = [
+		Point(0, 1), Point(1, 0), Point(0, -1), Point(-1, 0),
+		Point(1, 1), Point(1, -1), Point(-1, 1), Point(-1, -1)
+	];
+	return new Generator!Point({
+		foreach(delta; diagonals) {
+			Point np = pos + delta;
+			if (!grid.inRange(np)) continue;
+			yield(np);
+		}
+	});
+}
 
 int step(Grid!int grid) {
-	int result = 0;
+	int flashCount = 0;
 	Point[] flashPoints = [];
 
 	void increaseEnergy(Point pos) {
 		int val = grid.get(pos);
 		if (val == 9) {
-			writeln("Flash at ", pos);
 			flashPoints ~= pos;
-			result++;
+			flashCount++;
 		}
 		grid.set(pos, val + 1);	
 	}
@@ -39,20 +47,14 @@ int step(Grid!int grid) {
 		Point fp = flashPoints.back;
 		flashPoints.popBack;
 
-		foreach(delta; adjacents) {
-			Point np = fp + delta;
-			if (!grid.inRange(np)) continue;
+		foreach(np; grid.validDiagonals(fp)) {
 			increaseEnergy(np);
 		}
 	}
 
-	foreach(pos; PointRange(grid.size)) {
-		if (grid.get(pos) >= 10) {
-			grid.set(pos, 0);
-		}
-	}
-
-	return result;
+	// by going back to 0 at the end, we avoid double flashes
+	grid.range.each!((ref val) { if (val >= 10) val = 0; });
+	return flashCount;
 }
 
 auto solve (string fname) {
@@ -64,21 +66,14 @@ auto solve (string fname) {
 		grid.set(pos, to!int(digit));
 	}
 
-	int flashes = 0;
-	int i = 0;
-	for (; i < 100; ++i) {
-		flashes += step(grid);
-	}
+	int[] flashCounts = [];
 	int flashCount = 0;
 	while (flashCount != grid.size.x * grid.size.y) {
 		flashCount = step(grid);
-		i++;
+		flashCounts ~= flashCount;
 	}
 	
-	return [
-		flashes,
-		i
-	];
+	return [ flashCounts.take(100).sum, flashCounts.length ];
 }
 
 void main() {

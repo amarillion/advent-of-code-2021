@@ -45,6 +45,11 @@ class Grid(T) {
 		return data[toIndex(p)];
 	}
 
+	ref T get(Point p) {
+		assert(inRange(p));
+		return data[toIndex(p)];
+	}
+
 	string format(string cellSep = ", ", string lineSep = "\n") {
 		char[] result;
 		int i = 0;
@@ -52,7 +57,7 @@ class Grid(T) {
 		const int lineSize = size.x;
 		bool firstLine = true;
 		bool firstCell = true;
-		foreach (base; CoordRange!Point(size)) {
+		foreach (base; PointRange(size)) {
 			if (i % lineSize == 0 && !firstLine) {
 				result ~= lineSep;
 				firstCell = true;
@@ -65,6 +70,39 @@ class Grid(T) {
 			firstCell = false;
 		}
 		return result.idup;
+	}
+
+	struct NodeRange {
+
+		Grid!T parent;
+		int pos = 0;
+		int stride = 1;
+		int remain;
+
+		this(Grid!T parent, int stride = 1) {
+			this.parent = parent;
+			this.stride = stride;
+			remain = to!int(parent.data.length);
+		}
+
+		/* use ref to support in place-modification */
+		ref T front() {
+			return parent.data[pos];
+		}
+
+		void popFront() {
+			pos++;
+			remain--;
+		}
+
+		bool empty() const {
+			return remain <= 0;
+		}
+		
+	}
+
+	NodeRange range() {
+		return NodeRange(this);
 	}
 
 	override string toString() {
