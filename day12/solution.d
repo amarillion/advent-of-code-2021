@@ -12,27 +12,45 @@ import std.range;
 import std.uni;
 
 alias Edge = string[];
+alias Path = string[];
 
-int countPaths(string node, const Edge[] lines) {
-	if (node == "end") { return 1; }
+Path[] getPaths(string[] path, Edge[] lines, bool canRevisit) {
+	string node = path.back;
+	if (node == "end") { return [ path ]; }
 	
-	int result = 0;
+	Path[] result = [];
 	// if this node is lowercase, filter it from remain set.
-	bool dontReturn = (node.toLower() == node);
-	const Edge[] remain = dontReturn ? 
-		lines.filter!(edge => edge[0] != node && edge[1] != node).array :
-		lines;
+	bool isSmallCave(string n) { return n.toLower() == n; }
+
+	bool dontReturn = false;
+	Edge[] remain = lines;
+
+	if (isSmallCave(node)) {
+		if (!canRevisit || node == "start") {
+			remain = lines.filter!(edge => edge[0] != node && edge[1] != node).array;
+		}
+		else {
+			bool isRevisit = path[0..$-1].canFind(node);
+			if (isRevisit) {
+				dontReturn = true;
+				// filter out all visited lowercase caves now
+				foreach(filterNode; path) {
+					if (isSmallCave(filterNode)) {
+						remain = remain.filter!(edge => edge[0] != filterNode && edge[1] != filterNode).array;
+					}
+				}
+				canRevisit = false;
+			}
+		}
+	}
 
 	// find all that start with this node
 	foreach(line; lines) {
-
 		if (line[0] == node) {
-			writeln("Following ", node, " -> ", line[1], " ", remain);
-			result += countPaths(line[1], remain);
+			result ~= getPaths(path ~ line[1], remain, canRevisit);
 		}
 		else if (line[1] == node) {
-			writeln("Following ", node, " -> ", line[0], " ", remain);
-			result += countPaths(line[0], remain);
+			result ~= getPaths(path ~ line[0], remain, canRevisit);
 		}
 	}
 	return result;
@@ -41,13 +59,14 @@ int countPaths(string node, const Edge[] lines) {
 auto solve (string fname) {
 	string[] lines = readLines(fname);
 	Edge[] edges = lines.map!(s => s.split("-")).array;
-	writeln(edges);
-	int count = countPaths("start", edges);
-	return [ count ];
+	
+	Path[] paths1 = getPaths(["start"], edges, false);
+	Path[] paths2 = getPaths(["start"], edges, true);
+	return [ paths1.length, paths2.length ];
 }
 
 void main() {
-	assert (solve("test") == [ 10 ]);
-	assert (solve("test2") == [ 19 ]);
+	assert (solve("test") == [ 10, 36 ]);
+	assert (solve("test2") == [ 19, 103 ]);
 	writeln (solve("input"));
 }
