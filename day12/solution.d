@@ -13,56 +13,48 @@ import std.uni;
 
 alias Edge = string[];
 alias Path = string[];
+alias Node = string;
 
-Path[] getPaths(string[] path, Edge[] lines, bool canRevisit) {
+const(Path)[] getPaths(const Node[] path, const Node[][Node] adjacent, in Node[] exclude, bool canRevisit) {
 	string node = path.back;
 	if (node == "end") { return [ path ]; }
 	
-	Path[] result = [];
-	// if this node is lowercase, filter it from remain set.
+	const (Path)[] result = [];
 	bool isSmallCave(string n) { return n.toLower() == n; }
 
-	bool dontReturn = false;
-	Edge[] remain = lines;
+	const(Node)[] excludeNext = exclude;
 
 	if (isSmallCave(node)) {
-		if (!canRevisit || node == "start") {
-			remain = lines.filter!(edge => edge[0] != node && edge[1] != node).array;
+		if (!canRevisit) {
+			excludeNext ~= node;
 		}
 		else {
-			bool isRevisit = path[0..$-1].canFind(node);
-			if (isRevisit) {
-				dontReturn = true;
-				// filter out all visited lowercase caves now
-				foreach(filterNode; path) {
-					if (isSmallCave(filterNode)) {
-						remain = remain.filter!(edge => edge[0] != filterNode && edge[1] != filterNode).array;
-					}
-				}
+			auto visited = path[0..$-1];
+			if (visited.canFind(node)) {
+				excludeNext ~= visited.filter!isSmallCave.array;
 				canRevisit = false;
 			}
 		}
 	}
 
-	// find all that start with this node
-	foreach(line; lines) {
-		if (line[0] == node) {
-			result ~= getPaths(path ~ line[1], remain, canRevisit);
-		}
-		else if (line[1] == node) {
-			result ~= getPaths(path ~ line[0], remain, canRevisit);
-		}
+	foreach(dest; adjacent[node]) {
+		if (excludeNext.canFind(dest)) continue;
+		result ~= getPaths(path ~ dest, adjacent, excludeNext, canRevisit);
 	}
 	return result;
 }
 
 auto solve (string fname) {
-	string[] lines = readLines(fname);
-	Edge[] edges = lines.map!(s => s.split("-")).array;
+	Node[][Node] adjacent;
+	foreach(Edge e; readLines(fname).map!(s => s.split("-"))) {
+		adjacent[e[0]] ~= e[1];
+		adjacent[e[1]] ~= e[0];
+	}
 	
-	Path[] paths1 = getPaths(["start"], edges, false);
-	Path[] paths2 = getPaths(["start"], edges, true);
-	return [ paths1.length, paths2.length ];
+	return [
+		getPaths([ "start" ], adjacent, [ "start" ], false).length,
+		getPaths([ "start" ], adjacent, [ "start" ], true).length
+	];
 }
 
 void main() {
