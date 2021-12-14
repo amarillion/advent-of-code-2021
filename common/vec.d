@@ -112,22 +112,23 @@ struct vec(int N, V) {
 		return result.idup;
 	}
 
-	int opCmp(ref const vec!(N, V) s) const {
+	// use "auto ref const" to allow Lval and Rval here.
+	int opCmp()(auto ref const vec!(N, V) s) const {
 		foreach(i; 0..N) {
 			if (s.val[i] > val[i]) return -1;
 			if (s.val[i] < val[i]) return 1;
 		}
 		return 0;
 	}
+
 }
 
 unittest {
-	Point p1 = Point(2, 0);
-	Point p2 = Point(0, 1);
-	assert (p1 > p2);
-	// assert (Point(2, 0) > Point(1, 0));
-	// assert (Point(0, 2) > Point(0, 1));
-	// assert (Point(0, 1) > Point(2, 0));
+	assert (Point(2, 0) > Point(1, 0));
+	assert (Point(0, 2) > Point(0, 1));
+	assert (Point(1, 0) > Point(0, 2));
+	assert (Point(1, 0) == Point(1, 0));
+	assert (Point(1, 0) >= Point(1, 0));
 }
 
 alias vec2i = vec!(2, int);
