@@ -13,16 +13,32 @@ import std.uni;
 import common.util;
 import common.sparsegrid;
 
-int[string] applyRules(int[string] pairCounts, string[string] rules) {
-	int[string] result;
+alias PairCounts = ulong[string];
+
+PairCounts applyRules(PairCounts pairCounts, string[string] rules) {
+	PairCounts result;
 	foreach(k, v; pairCounts) {
-		string toInsert = rules[k];
-		string left = k[0] ~ toInsert;
-		string right = toInsert ~ k[1];
+		string left = k[0] ~ rules[k];
+		string right = rules[k] ~ k[1];
 		result[left] += v;
 		result[right] += v; 
 	}
 	return result;
+}
+
+ulong score(PairCounts pairCounts, string init) {
+	ulong[char] elementCounts;
+	foreach(k, v; pairCounts) {
+		char element = k[0];
+		// only count left half of each pair
+		elementCounts[element] += v;
+	}
+	// the only thing we're missing is the closing pair
+	elementCounts[init[$-1]] += 1;
+
+	ulong[] elementValues = elementCounts.values;
+	sort(elementValues);
+	return elementValues[$-1] - elementValues[0];
 }
 
 auto solve (string fname) {
@@ -34,36 +50,26 @@ auto solve (string fname) {
 		rules[rule[0]] = rule[1];
 	}
 	
-	int[string] pairCounts;
+	PairCounts pairCounts;
 	foreach(pair; init.slide(2)) {
 		pairCounts[to!string(pair)]++;
 	}
 
-	writeln(pairCounts);
-	for (int i = 0; i < 10; ++i) {
+	int i = 0;
+	for (; i < 10; ++i) {
 		pairCounts = applyRules(pairCounts, rules);
 	}
-	writeln(pairCounts);
+	ulong part1 = score(pairCounts, init);
 
-	// now get elemental quantities.
-	int[char] elementCounts;
-	foreach(k, v; pairCounts) {
-		char element = k[0];
-		// only count left half.
-		elementCounts[element] += v;
+	for (; i < 40; ++i) {
+		pairCounts = applyRules(pairCounts, rules);
 	}
-	elementCounts[init[$-1]] += 1;
-
-	int[] elementValues = elementCounts.values;
-	sort(elementValues);
-	writeln(elementValues);
-
-	return [
-		elementValues[$-1] - elementValues[0]
-	];
+	ulong part2 = score(pairCounts, init);
+	
+	return [ part1, part2 ];
 }
 
 void main() {
-	assert (solve("test") == [ 1588 ]);
+	assert (solve("test") == [ 1588, 2_188_189_693_529 ]);
 	writeln (solve("input"));
 }
