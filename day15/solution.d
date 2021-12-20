@@ -85,14 +85,26 @@ int dijkstra(N)(N source, N dest, N[] delegate(N) getAdjacent, int delegate(N) g
 		}
 	}
 
-	N current = dest;
-	while (current != source) {
-		writefln("%s %s %s", current, dist[current], getWeight(current));
-		current = prev[current];
-	}
+	// N current = dest;
+	// while (current != source) {
+	// 	current = prev[current];
+	// }
 	return dist[dest];
 }
 
+Grid!N expandGrid(N)(Grid!N grid) {
+	Grid!N result = new Grid!N(grid.size * 5);
+	foreach(p; PointRange(grid.size)) {
+		foreach(q; PointRange(Point(5))) {
+			
+			Point np = p + Point(q.x * grid.size.x, q.y * grid.size.y);
+			int val = grid.get(p) + q.x + q.y;
+			while (val > 9) { val -= 9; }
+			result.set(np, val);
+		}
+	}
+	return result;
+}
 
 auto solve (string fname) {
 	string[] lines = readLines(fname);
@@ -110,10 +122,21 @@ auto solve (string fname) {
 		n => grid.get(n)
 	);
 
-	return [ cost ];
+	Grid!int grid2 = expandGrid(grid);
+	// writeln(grid2.format(""));
+
+	int cost2 = dijkstra!Point(
+		Point(0),
+		grid2.size - 1,
+		n => getAdjacent(grid2, n),
+		n => grid2.get(n)
+	);
+
+	return [ cost, cost2 ];
 }
 
 void main() {
-	assert (solve("test") == [ 40 ]);
+	writeln(solve("test"));
+	assert (solve("test") == [ 40, 315 ]);
 	writeln (solve("input")); // 714 is correct
 }
