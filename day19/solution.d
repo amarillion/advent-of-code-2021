@@ -138,17 +138,15 @@ struct Match {
 	Matrix orientation;
 }
 
-Match tryMatch(const ref Scanner scannerA, const ref Scanner scannerB, Matrix baseOrientation = orientations[0], 
-	vec3i baseTranslation = vec3i(0)
-) {
-	// set translation to first beacon.
-	foreach(vec3i a; scannerA.keys) {
-		foreach(vec3i b; scannerB.keys) {
-			foreach(orientation; orientations) {
-				// -20,-1133,1061
+Match tryMatch(const ref Scanner scannerA, const ref Scanner scannerB) {
+	foreach(orientation; orientations) {
+		int[vec3i] deltaCounts;
+		foreach(vec3i a; scannerA.keys) {
+			foreach(vec3i b; scannerB.keys) {
 				vec3i translation = a - mul(b, orientation);
-				int count = countMatches(scannerA, scannerB, orientation, translation);
-				if (count >= 12) {
+				deltaCounts[translation]++;
+				if (deltaCounts[translation] >= 12) {
+					// writefln("%s %s %s %s %s", a, b, translation, orientation, count);
 					return Match(true, translation, orientation);
 				}
 			}
@@ -184,8 +182,11 @@ auto solve (string fname) {
 	normalized[0] = Match(true, vec3i(0), orientations[0]);
 
 	vec3i[] beacons = [];
-
-	// while (linked < scanners.length) {
+	foreach(n; scanners[0].keys) {
+		beacons ~= n;
+	}
+	
+	while (linked < scanners.length) {
 		for(int i = 0; i < scanners.length; ++i) {
 			if (!normalized[i].found) continue;
 
@@ -193,17 +194,18 @@ auto solve (string fname) {
 				if (i == j) continue;
 				if (normalized[j].found) continue;
 
-				Match match = tryMatch(scanners[i], scanners[j], normalized[i].orientation, normalized[i].translation);
+				Match match = tryMatch(scanners[i], scanners[j]);
 
 				if (match.found) {
 					writeln(i, " ", j, " matches at ", match.translation, " ", match.orientation);
+					linked++;
 					normalized[j] = match;
 
 					Scanner norm = normalize(scanners[j], match.orientation, match.translation);
 					foreach(n; norm.keys) {
 						beacons ~= n;
 					}
-
+					scanners[j] = norm;
 					break;
 				}
 
@@ -211,7 +213,7 @@ auto solve (string fname) {
 
 		}
 
-	// }
+	}
 
 	
 	sort(beacons);
@@ -249,16 +251,21 @@ void main() {
 	Matrix orientation2 = [[0, -1, 0], [0, 0, -1], [1, 0, 0]];
 	vec3i translation2 = vec3i(-20,-1133,1061);
 	assert (countMatches(norm1, scanners[4], orientation2, translation2) >= 12);
+	assert(vec3i(459,-707,401) in norm1);
+	assert(vec3i(-739,-1745,668) in norm1);
 	
-	// foreach (o; orientations) {
-	// 	writefln ("%s %s", o, countMatches(norm1, scanners[4], o, );
-	// }
-
-	Match match_1_4 = tryMatch(norm1, scanners[4]); 
-	// writeln(norm4.keys);
-	// Match match_1_4 = tryMatch(scanners[1], scanners[4], orientation, translation); 
-	// writeln(match_1_4);
-	// assert (match_1_4.found);
+	// this point matches between norm1 and scanners[4]
+	vec3i a2 = vec3i(534, -1912, 768);
+	vec3i b2 = vec3i(-293, -554, 779);
+	assert(a2 in norm1);
+	assert(b2 in scanners[4]);
+	vec3i translation3 = vec3i(-20, -1133, 1061);
+	Matrix orientation3 = [[0, 0, 1], [-1, 0, 0], [0, -1, 0]];
+	assert(a2 - mul(b2, orientation3) == translation3);
+	Match match_1_4 = tryMatch(norm1, scanners[4]);
+	assert (match_1_4.found);
+	assert (match_1_4.translation == translation3);
+	assert (match_1_4.orientation == orientation3);
 	
 	assert (solve("test") == [ 79 ]);
 	writeln (solve("input"));
