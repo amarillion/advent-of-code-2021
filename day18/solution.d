@@ -118,19 +118,19 @@ bool isSplit(Node root) {
 }
 
 auto leftToRight(Node root) {
-	return new Generator!(Node)({
-		Node[] stack = [ root ];
-		while (stack.length > 0) {
-			Node current = stack.front;
-			stack.popFront;
-			if (!current.isLiteral) {
-				stack = [ current.left, current.right ] ~ stack;
-			}
-			else {
-				yield(current);
-			}
+	Node[] result = [];
+	Node[] stack = [ root ];
+	while (stack.length > 0) {
+		Node current = stack.front;
+		stack.popFront;
+		if (!current.isLiteral) {
+			stack = [ current.left, current.right ] ~ stack;
 		}
-	});
+		else {
+			result ~= current;
+		}
+	}
+	return result;
 }
 
 Node explode(Node input) {
@@ -149,7 +149,7 @@ bool isExplode(Node input) {
 	found.isLiteral = true;
 	found.literal = 0;
 	
-	Node[] leaves = leftToRight(input).array;
+	Node[] leaves = leftToRight(input);
 
 	
 	Node[] toRight = find(leaves, found);
@@ -170,7 +170,7 @@ Node reduce(Node root) {
 	return root;
 }
 
-ulong magnitude(Node node) {
+int magnitude(Node node) {
 	if (node.isLiteral) {
 		return node.literal;
 	}
@@ -187,7 +187,24 @@ auto solve (string fname) {
 		acc = add (acc, parse(line));
 		reduce(acc);
 	}
-	return [ magnitude(acc) ];
+	int part1 = magnitude(acc);
+
+	int maxSum = 0;
+	for(int i = 0; i < lines.length; ++i) {
+		for(int j = 0; j < lines.length; ++j) {
+			if (i == j) continue;
+			Node ni = parse(lines[i]);
+			Node nj = parse(lines[j]);
+			
+			Node x = add(ni, nj);
+			reduce(x);
+			int val = magnitude(x);
+			if (val > maxSum) {
+				maxSum = val;
+			}
+		}
+	}
+	return [ part1, maxSum ];
 }
 
 void main() {
@@ -211,7 +228,7 @@ void main() {
 	));
 	assert(magnitude(parse("[[1,2],[[3,4],5]]")) == 143);
 	assert(magnitude(parse("[[[[0,7],4],[[7,8],[6,0]]],[8,1]]")) == 1384);
-	
-	assert (solve("test") == [ 4140 ]);
+
+	assert (solve("test") == [ 4140, 3993 ]);
 	writeln (solve("input"));
 }
