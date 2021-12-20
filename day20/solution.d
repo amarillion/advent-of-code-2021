@@ -58,14 +58,22 @@ auto solve (string fname) {
 		grid.set(pos, ch);
 	}
 
-	grid = transform(grid, rule, 0);
-	grid = transform(grid, rule, 1);
-	
+	int i = 0;
+	for (; i < 2; ++i) {
+		grid = transform(grid, rule, i);
+	}
+
 	auto part1 = grid.range.count('#');
-	return [ part1 ];
+	for (; i < 50; ++i) {
+		grid = transform(grid, rule, i);
+	}
+	auto part2 = grid.range.count('#');
+	
+	
+	return [ part1, part2 ];
 }
 
 void main() {
-	assert (solve("test") == [ 35 ]);
-	writeln (solve("input")); // not: 5127, not 5392
+	assert (solve("test") == [ 35, 3351 ]);
+	writeln (solve("input"));
 }
