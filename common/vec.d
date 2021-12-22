@@ -111,21 +111,20 @@ struct vec(int N, V) {
 
 	// use "auto ref const" to allow Lval and Rval here.
 	int opCmp()(auto ref const vec!(N, V) s) const {
-		foreach(i; 0..N) {
+		for(int i = N - 1; i >= 0; --i) {
 			if (s.val[i] > val[i]) return -1;
 			if (s.val[i] < val[i]) return 1;
 		}
 		return 0;
 	}
-
 }
 
 unittest {
 	assert (Point(2, 0) > Point(1, 0));
-	assert (Point(0, 2) > Point(0, 1));
-	assert (Point(1, 0) > Point(0, 2));
+	assert (Point(0, 2) >= Point(0, 1));
+	assert (Point(1, 0) < Point(0, 2));
 	assert (Point(1, 0) == Point(1, 0));
-	assert (Point(1, 0) >= Point(1, 0));
+	assert (Point(1, 0) <= Point(1, 0));
 }
 
 alias vec2i = vec!(2, int);
