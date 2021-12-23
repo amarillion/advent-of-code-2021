@@ -9,17 +9,13 @@ import std.array;
 import std.concurrency;
 import std.math;
 import std.range;
-import std.uni;
 import common.util;
-import common.grid;
 import common.coordrange;
 import std.bigint;
 
-alias vec3l = vec!(3, long);
-
 struct Cuboid {
-	vec3l lowestCorner;
-	vec3l size;
+	vec3i lowestCorner;
+	vec3i size;
 
 	// use "auto ref const" to allow Lval and Rval here.
 	int opCmp()(auto ref const Cuboid s) const {
@@ -31,39 +27,38 @@ struct Cuboid {
 	}
 }
 
-bool inside(vec3l p, Cuboid a) {
-	vec3l relative = p - a.lowestCorner;
+bool inside(vec3i p, Cuboid a) {
+	vec3i relative = p - a.lowestCorner;
 	return (relative.x >= 0 && relative.y >= 0 && relative.z >= 0 &&
 		relative.x <= a.size.x && relative.y <= a.size.y && relative.z <= a.size.z);
 }
 
 bool overlaps(Cuboid a, Cuboid b) {
-	vec3l a1 = a.lowestCorner;
-	vec3l a2 = a.lowestCorner + a.size;
-	vec3l b1 = b.lowestCorner;
-	vec3l b2 = b.lowestCorner + b.size;
+	vec3i a1 = a.lowestCorner;
+	vec3i a2 = a.lowestCorner + a.size;
+	vec3i b1 = b.lowestCorner;
+	vec3i b2 = b.lowestCorner + b.size;
 
-	// writefln("[%s %s] [%s %s]", a1, a2, b1, b2);
 	return a2.x > b1.x && a1.x < b2.x 
 		&& a2.y > b1.y && a1.y < b2.y
 		&& a2.z > b1.z && a1.z < b2.z;
 }
 
-Cuboid[] bisect(Cuboid a, long pos, int dim) {
-	vec3l p1 = a.lowestCorner;
-	vec3l p2 = a.lowestCorner + a.size;
+Cuboid[] bisect(Cuboid a, int pos, int dim) {
+	vec3i p1 = a.lowestCorner;
+	vec3i p2 = a.lowestCorner + a.size;
 
 	// doesn't bisect, return unchanged.
 	if (pos <= p1.val[dim] || pos >= p2.val[dim]) {
 		return [ a ];
 	}
 
-	vec3l s1 = a.size;
+	vec3i s1 = a.size;
 	s1.val[dim] = pos - p1.val[dim];
-	vec3l s2 = a.size;
+	vec3i s2 = a.size;
 	s2.val[dim] = p2.val[dim] - pos;
 	
-	vec3l p15 = p1;
+	vec3i p15 = p1;
 	p15.val[dim] = pos;
 
 	assert(s1.x > 0 && s1.y > 0 && s1.z > 0);
@@ -74,21 +69,22 @@ Cuboid[] bisect(Cuboid a, long pos, int dim) {
 	];
 }
 
-// returns variable number, could be up to 27
+// splits a & b in three lists: parts of a, overlapping, and parts of b.
+// returns variable number of cubes, could be up to 27
 Cuboid[][] intersections(Cuboid a, Cuboid b) {
 	Cuboid[] aSplits = [ a ];
 	Cuboid[] bSplits = [ b ];
 
-	vec3l a1 = a.lowestCorner;
-	vec3l a2 = a.lowestCorner + a.size;
-	vec3l b1 = b.lowestCorner;
-	vec3l b2 = b.lowestCorner + b.size;
+	vec3i a1 = a.lowestCorner;
+	vec3i a2 = a.lowestCorner + a.size;
+	vec3i b1 = b.lowestCorner;
+	vec3i b2 = b.lowestCorner + b.size;
 
 	for (int dim = 0; dim < 3; ++dim) {
-		aSplits = aSplits.map!(q => q.bisect(b1.val[dim], dim)).array.join.array;
-		aSplits = aSplits.map!(q => q.bisect(b2.val[dim], dim)).array.join.array;
-		bSplits = bSplits.map!(q => q.bisect(a1.val[dim], dim)).array.join.array;
-		bSplits = bSplits.map!(q => q.bisect(a2.val[dim], dim)).array.join.array;
+		aSplits = aSplits.map!(q => q.overlaps(b) ? q.bisect(b1.val[dim], dim).array : [ q ]).join.array;
+		aSplits = aSplits.map!(q => q.overlaps(b) ? q.bisect(b2.val[dim], dim).array : [ q ]).join.array;
+		bSplits = bSplits.map!(q => q.overlaps(a) ? q.bisect(a1.val[dim], dim).array : [ q ]).join.array;
+		bSplits = bSplits.map!(q => q.overlaps(a) ? q.bisect(a2.val[dim], dim).array : [ q ]).join.array;
 	}
 
 	// determine overlapping
@@ -97,9 +93,6 @@ Cuboid[][] intersections(Cuboid a, Cuboid b) {
 	Cuboid[] overlapping = aSplits.setIntersection(bSplits).array;
 	aSplits = aSplits.setDifference(overlapping).array;
 	bSplits = bSplits.setDifference(overlapping).array;
-	// writefln("aSplits after splitting: %s", aSplits.length);
-	// writefln("bSplits after splitting: %s", bSplits.length);
-	// writefln("overlapping: %s", overlapping.length);
 	return [
 		aSplits,
 		overlapping,
@@ -111,32 +104,17 @@ BigInt volume(Cuboid a) {
 	return to!BigInt(a.size.x) * to!BigInt(a.size.y) * to!BigInt(a.size.z);
 }
 
-vec3l[] allPoints(Cuboid c) {
-	vec3l[] result = [];
-	foreach(p; CoordRange!vec3l(c.lowestCorner, c.lowestCorner + c.size)) {
-		result ~= p;
-	}
-	return result;
-}
-
-void test() {
-	Cuboid c1 = Cuboid(vec3l(37771, 34417, -47992), vec3l(21006, 28158, 24891));
-	Cuboid c2 = Cuboid(vec3l(36305, 41145, -42601), vec3l(37933, 11090, 14106)); 
-	assert(overlaps(c1, c2));
-	// TODO: bugged - there should be an intersection...	
-	// writeln(intersections(c1, c2));
-	assert(intersections(c1, c2) != [[c1],[], [c2]]);
-	
-	Cuboid a = Cuboid(vec3l(0, 0, 0), vec3l(5, 3, 4));
-	Cuboid b = Cuboid(vec3l(-2, 1, 2), vec3l(5, 4, 3));
-	Cuboid c = Cuboid(vec3l(1,1,1), vec3l(1,1,1));
+void test() {	
+	Cuboid a = Cuboid(vec3i(0, 0, 0), vec3i(5, 3, 4));
+	Cuboid b = Cuboid(vec3i(-2, 1, 2), vec3i(5, 4, 3));
+	Cuboid c = Cuboid(vec3i(1,1,1), vec3i(1,1,1));
 
 	assert(a.volume == 60);
 	assert(b.volume == 60);
+	assert(c.volume == 1);
 	
-	vec3l p1 = vec3l(3, 1, 2);
-	vec3l p2 = vec3l(8,0,0);
-	vec3l p3 = vec3l(0,3,4);
+	vec3i p1 = vec3i(3, 1, 2);
+	vec3i p2 = vec3i(8,0,0);
 
 	assert(p1.inside(a));
 	assert(p1.inside(b));
@@ -152,137 +130,70 @@ void test() {
 	assert(c.overlaps(a));
 	assert(!c.overlaps(b));
 
-	// assert(a.bisect(8, 1) == [ a ]);
-
-	// Cuboid[] aExpected = [
-	// 	Cuboid(vec3l(0,0,0), vec3l(3,1,2)), 
-	// 	Cuboid(vec3l(3,0,0), vec3l(2,1,2)), 
-	// 	Cuboid(vec3l(0,1,0), vec3l(3,2,2)), 
-	// 	Cuboid(vec3l(3,1,0), vec3l(2,2,2)), 		
-	// 	Cuboid(vec3l(0,0,2), vec3l(3,1,2)), 
-	// 	Cuboid(vec3l(3,0,2), vec3l(2,1,2)), 
-	// 	Cuboid(vec3l(0,1,2), vec3l(3,2,2)), 
-	// 	Cuboid(vec3l(3,1,2), vec3l(2,2,2)), 
-	// ];
-	// assert (a.splitCuboid(p1) == aExpected);
-	// assert (a.volume == aExpected.map!volume.sum);
-
-	// Cuboid[] bExpected = [
-	// 	Cuboid(vec3l(-2, 1, 2), vec3l(2, 2, 2)), 
-	// 	Cuboid(vec3l( 0, 1, 2), vec3l(3, 2, 2)), 
-	// 	Cuboid(vec3l(-2, 3, 2), vec3l(2, 2, 2)), 
-	// 	Cuboid(vec3l( 0, 3, 2), vec3l(3, 2, 2)), 
-	// 	Cuboid(vec3l(-2, 1, 4), vec3l(2, 2, 1)), 
-	// 	Cuboid(vec3l( 0, 1, 4), vec3l(3, 2, 1)), 
-	// 	Cuboid(vec3l(-2, 3, 4), vec3l(2, 2, 1)), 
-	// 	Cuboid(vec3l( 0, 3, 4), vec3l(3, 2, 1)), 
-	// ];
-	// assert (b.splitCuboid(p1) == [ b ]);
-	// assert (b.splitCuboid(p3) == bExpected);
-	// assert (b.volume == bExpected.map!volume.sum);
-
 	assert (intersections(a, b) == [
 		[
-			Cuboid(vec3l(0,0,0), vec3l(3,1,2)), 
-			Cuboid(vec3l(3,0,0), vec3l(2,1,2)), 
-			Cuboid(vec3l(0,1,0), vec3l(3,2,2)), 
-			Cuboid(vec3l(3,1,0), vec3l(2,2,2)), 		
-			Cuboid(vec3l(0,0,2), vec3l(3,1,2)), 
-			Cuboid(vec3l(3,0,2), vec3l(2,1,2)), 
-			Cuboid(vec3l(3,1,2), vec3l(2,2,2)), 
+			Cuboid(vec3i(0,0,0), vec3i(3,1,4)), 
+			Cuboid(vec3i(3,0,0), vec3i(2,3,4)), 
+			Cuboid(vec3i(0,1,0), vec3i(3,2,2)), 
 		],
 		[
-			Cuboid(vec3l(0,1,2), vec3l(3,2,2)),
+			Cuboid(vec3i(0,1,2), vec3i(3,2,2)),
 		],
 		[
-			Cuboid(vec3l(-2, 1, 2), vec3l(2, 2, 2)), 
-			Cuboid(vec3l(-2, 3, 2), vec3l(2, 2, 2)), 
-			Cuboid(vec3l( 0, 3, 2), vec3l(3, 2, 2)), 
-			Cuboid(vec3l(-2, 1, 4), vec3l(2, 2, 1)), 
-			Cuboid(vec3l( 0, 1, 4), vec3l(3, 2, 1)), 
-			Cuboid(vec3l(-2, 3, 4), vec3l(2, 2, 1)), 
-			Cuboid(vec3l( 0, 3, 4), vec3l(3, 2, 1)), 
+			Cuboid(vec3i(-2, 1, 2), vec3i(2, 4, 3)), 
+			Cuboid(vec3i( 0, 3, 2), vec3i(3, 2, 3)), 
+			Cuboid(vec3i( 0, 1, 4), vec3i(3, 2, 1)), 
 		],
 	]);
 
-	// writeln(intersections(Cuboid(vec3l(0), vec3l(3,3,1)), Cuboid(vec3l(1,1,0), vec3l(1)) ));
-
-	assert (intersections(Cuboid(vec3l(0), vec3l(3,3,1)), Cuboid(vec3l(1,1,0), vec3l(1))) == [
+	assert (intersections(Cuboid(vec3i(0), vec3i(3,3,1)), Cuboid(vec3i(1,1,0), vec3i(1))) == [
 		[
-			Cuboid(vec3l(0,0,0), vec3l(1)), 
-			Cuboid(vec3l(1,0,0), vec3l(1)), 
-			Cuboid(vec3l(2,0,0), vec3l(1)), 
-			Cuboid(vec3l(0,1,0), vec3l(1)), 		
-			Cuboid(vec3l(2,1,0), vec3l(1)), 
-			Cuboid(vec3l(0,2,0), vec3l(1)), 
-			Cuboid(vec3l(1,2,0), vec3l(1)), 
-			Cuboid(vec3l(2,2,0), vec3l(1)), 
+			Cuboid(vec3i(0,0,0), vec3i(1, 3, 1)), 
+			Cuboid(vec3i(1,0,0), vec3i(1, 1, 1)), 
+			Cuboid(vec3i(2,0,0), vec3i(1, 3, 1)), 
+			Cuboid(vec3i(1,2,0), vec3i(1, 1, 1)), 
 		],
 		[
-			Cuboid(vec3l(1,1,0), vec3l(1)),
+			Cuboid(vec3i(1,1,0), vec3i(1, 1, 1)),
 		],
 		[],
 	]);
 
-	assert(overlaps(
-		Cuboid(vec3l(5,0,0), vec3l(1, 10, 1)), 
-		Cuboid(vec3l(0,5,0), vec3l(10, 1, 1)), 
-	));
-	assert(!overlaps(
-		Cuboid(vec3l(0,0,0), vec3l(1, 10, 1)), 
-		Cuboid(vec3l(1,0,0), vec3l(1, 10, 1)), 
-	));
+	assert(intersections(
+		Cuboid(vec3i(5,0,0), vec3i(1, 10, 1)), 
+		Cuboid(vec3i(0,5,0), vec3i(10, 1, 1)), 
+	) == [
+		[
+			Cuboid(vec3i(5,0,0), vec3i(1, 5, 1)),
+			Cuboid(vec3i(5,6,0), vec3i(1, 4, 1)),
+		],
+		[
+			Cuboid(vec3i(5,5,0), vec3i(1, 1, 1)),
+		],
+		[
+			Cuboid(vec3i(0,5,0), vec3i(5, 1, 1)),
+			Cuboid(vec3i(6,5,0), vec3i(4, 1, 1)),
+		]
+	]);
 
-	Cuboid[] list0 = [ Cuboid(vec3l(10,10,0), vec3l(2, 2, 1)) ];
-	assert(list0.map!volume.sum == 4);
-	
-	list0 = merge(list0, Cuboid(vec3l(8,10,0), vec3l(2, 2, 1)), true);
-	list0 = merge(list0, Cuboid(vec3l(10,8,0), vec3l(2, 2, 1)), true);
-	list0 = merge(list0, Cuboid(vec3l(8,8,0), vec3l(2, 2, 1)), true);
-	assert(list0.map!volume.sum == 16);
-	
-	list0 = merge(list0, Cuboid(vec3l(9,9,0), vec3l(2, 2, 1)), false);
-	assert(list0.map!volume.sum == 12);
-
-/*
-on x=10..12,y=10..12,z=10..12
-on x=11..13,y=11..13,z=11..13
-off x=9..11,y=9..11,z=9..11
-on x=10..10,y=10..10,z=10..10
-*/
-
-
-	Cuboid[] cc = [
-		Cuboid(vec3l(10,10,10), vec3l(3,3,3)),
-		Cuboid(vec3l(11,11,11), vec3l(3,3,3)),
-		Cuboid(vec3l(9,9,9), vec3l(3,3,3)),
-		Cuboid(vec3l(10,10,10), vec3l(1,1,1)),
-	];
-
-	
-	// start again
+	/*
+	on x=10..12,y=10..12,z=10..12
+	on x=11..13,y=11..13,z=11..13
+	off x=9..11,y=9..11,z=9..11
+	on x=10..10,y=10..10,z=10..10
+	*/	
 	Cuboid[] list = [];
-	list = merge(list, cc[0], true);
+	list = merge(list, Cuboid(vec3i(10,10,10), vec3i(3,3,3)), true);
 	assert(list.map!volume.sum == 27);
 	
-	list = merge(list, cc[1], true);
+	list = merge(list, Cuboid(vec3i(11,11,11), vec3i(3,3,3)), true);
 	assert(list.map!volume.sum == 27 + 19);
 
-	list = merge(list, cc[2], false);
+	list = merge(list, Cuboid(vec3i(9,9,9), vec3i(3,3,3)), false);
 	assert(list.map!volume.sum == 27 + 19 - 8);
 
-	list = merge(list, cc[3], true);
-	// writeln(list);
+	list = merge(list, Cuboid(vec3i(10,10,10), vec3i(1,1,1)), true);
 	assert(list.map!volume.sum == 27 + 19 - 8 + 1);
-}
-
-bool nonOverlapping(Cuboid[] list) {
-	for(int i = 0; i + 1 < list.length; ++i) {
-		for(int j = i + 1; j < list.length; ++j) {
-			if (overlaps(list[i], list[j])) { return false; }
-		}
-	}
-	return true;
 }
 
 Cuboid[][] breakup(Cuboid[] list, Cuboid cc) {
@@ -293,21 +204,16 @@ Cuboid[][] breakup(Cuboid[] list, Cuboid cc) {
 	Cuboid[] bResult;
 	Cuboid[] overlapping;
 
-	// int ii = 0;
+	//TODO: this algorithm can probably be optimized
 	while (aList.length > 0) {
 		Cuboid a = aList.front;
 		aList.popFront;
 		bool overlapFound = false;
 		Cuboid[] newBlist = [];
 		foreach(b; bList) {
-			// ii++;
-			// if (ii % 1000 == 0) write(".");
 			if (a.overlaps(b)) {
 				assert(!overlapFound); // shouldn't find two overlaps in one scan
-				// writefln("Get intersections %s %s", a, b);
 				Cuboid[][] i = intersections(a, b);
-				
-				if (i[0] == [a] && i[2] == [b]) continue; // no overlap after all due to bug
 				
 				aList ~= i[0];
 				overlapping ~= i[1];
@@ -324,20 +230,7 @@ Cuboid[][] breakup(Cuboid[] list, Cuboid cc) {
 		}
 	}
 	bResult = bList;
-	//TODO: shouldn't be necessary
-	sort(aResult);
-	aResult = uniq(aResult).array;
-
-	sort(overlapping);
-	overlapping = uniq(overlapping).array;
-
-	sort(bResult);
-	bResult = uniq(bResult).array;
-
-	// assert(nonOverlapping(aResult));
-	// assert(nonOverlapping(bResult));
-	// assert(nonOverlapping(overlapping));
-	// assert(nonOverlapping(aResult ~ overlapping ~ bResult));
+	
 	BigInt[] v = [
 		list.map!volume.sum,
 		cc.volume,
@@ -346,8 +239,8 @@ Cuboid[][] breakup(Cuboid[] list, Cuboid cc) {
 		overlapping.map!volume.sum,
 		bResult.map!volume.sum,
 	];
-	// writeln(v);
-	// writefln("%s\nLeft: %s\nIntersection: %s\nRight: %s", v, aResult.map!allPoints.join, overlapping.map!allPoints.join, bResult.map!allPoints.join);
+
+	// sanity check: volumes of inputs and outputs should match
 	assert(v[0] == v[2] + v[3]);
 	assert(v[1] == v[3] + v[4]);
 	assert(v[0] + v[1] == v[2] + 2 * v[3] + v[4]);
@@ -357,9 +250,7 @@ Cuboid[][] breakup(Cuboid[] list, Cuboid cc) {
 }
 
 auto merge(Cuboid[] list, Cuboid c, bool add) {
-	// writefln("merging: add=%s cuboid=%s to list of length %s", add, c, list.length);
 	Cuboid[][] brokenUp = breakup(list, c);
-	// writeln("Breakup done");
 	Cuboid[] result;
 	if (add) {
 		result = brokenUp[0] ~ brokenUp[1] ~ brokenUp[2];
@@ -374,7 +265,7 @@ auto solve (string fname, bool onlyBelowFifty) {
 	string[] lines = readLines(fname);
 	
 	Cuboid[] onCubes = [];
-	Cuboid fifty = Cuboid(vec3l(-50, -50, -50), vec3l(100, 100, 100));
+	Cuboid fifty = Cuboid(vec3i(-50, -50, -50), vec3i(100, 100, 100));
 
 	foreach(l, line; lines) {
 		string[] fields = line.split(" ");
@@ -383,12 +274,12 @@ auto solve (string fname, bool onlyBelowFifty) {
 		sort(coords[0]);
 		sort(coords[1]);
 		sort(coords[2]);
-		vec3l p1 = vec3l(coords[0][0], coords[1][0], coords[2][0]);
-		vec3l p2 = vec3l(coords[0][1], coords[1][1], coords[2][1]);
+		vec3i p1 = vec3i(coords[0][0], coords[1][0], coords[2][0]);
+		vec3i p2 = vec3i(coords[0][1], coords[1][1], coords[2][1]);
 		if (onlyBelowFifty && !p1.inside(fifty)) continue;
 
 		onCubes = merge(onCubes, Cuboid(p1, (p2 - p1) + 1), turnOn);
-		writeln(l, " ", onCubes.map!volume.sum);
+		writefln("line: %s, volume: %s, cubes: %s", l, onCubes.map!volume.sum, onCubes.length);
 	}
 
 	return [ onCubes.map!volume.sum ];
@@ -397,7 +288,7 @@ auto solve (string fname, bool onlyBelowFifty) {
 void main() {
 	test();
 
-	assert (solve("test", true) == [ 590784 ]);
+	assert (solve("test", true) == [ 590_784 ]);
 	assert (solve("test2", false) == [ BigInt("2758514936282235") ]);
 	writeln (solve("input", false));
 }
