@@ -73,7 +73,7 @@ auto dijkstra(N, E)(
 		i--; // 0 -> -1 means Infinite.
 		if (i == 0) break;
 
-		if (i % 10000 == 0) { writeln(i); }
+		if (i % 10000 == 0) { writeln(i, " ", open.length); }
 	}
 
 	return prev;
@@ -93,12 +93,20 @@ enum bool[int] hallDisallowed = [
 enum char[int] hallTarget = [
 	11: 'A',
 	12: 'A',
-	13: 'B',
-	14: 'B',
-	15: 'C',
-	16: 'C',
-	17: 'D',
-	18: 'D'
+	13: 'A',
+	14: 'A',
+	15: 'B',
+	16: 'B',
+	17: 'B',
+	18: 'B',
+	19: 'C',
+	20: 'C',
+	21: 'C',
+	22: 'C',
+	23: 'D',
+	24: 'D',
+	25: 'D',
+	26: 'D',
 ];
 enum int[char] podCosts = [
 	'A': 1, 'B': 10, 'C': 100, 'D': 1000
@@ -108,32 +116,46 @@ int[][] hallAdj = [
 	/* 1 */ [ 0, 2 ], 
 	/* 2 */ [ 1, 3, 11 ], 
 	/* 3 */ [ 2, 4 ], 
-	/* 4 */ [ 3, 5, 13 ], 
+	/* 4 */ [ 3, 5, 15 ], 
 	/* 5 */ [ 4, 6 ], 
-	/* 6 */ [ 5, 7, 15 ], 
+	/* 6 */ [ 5, 7, 19 ], 
 	/* 7 */ [ 6, 8 ], 
-	/* 8 */ [ 7, 9, 17 ], 
+	/* 8 */ [ 7, 9, 23 ], 
 	/* 9 */ [ 8, 10 ], 
 	/*10 */ [ 9 ], 
 	/*11 */ [ 2, 12 ], 
-	/*12 */ [ 11 ], 
-	/*13 */ [ 4, 14 ], 
+	/*12 */ [ 11, 13 ], 
+	/*13 */ [ 12, 14 ], 
 	/*14 */ [ 13 ], 
-	/*15 */ [ 6, 16 ], 
-	/*16 */ [ 15 ], 
-	/*17 */ [ 8, 18 ], 
+	/*15 */ [ 4, 16 ], 
+	/*16 */ [ 15, 17 ], 
+	/*17 */ [ 16, 18 ], 
 	/*18 */ [ 17 ], 
+	/*19 */ [ 6, 20 ], 
+	/*20 */ [ 19, 21 ], 
+	/*21 */ [ 20, 22 ], 
+	/*22 */ [ 21 ], 
+	/*23 */ [ 8, 24 ], 
+	/*24 */ [ 23, 25 ], 
+	/*25 */ [ 24, 26 ], 
+	/*26 */ [ 25 ], 
 ];
 enum Point[int] podPoints = [ 
-	11: Point(3,2), 12: Point(3,3), 
-	13: Point(5,2), 14: Point(5,3), 
-	15: Point(7,2), 16: Point(7,3), 
-	17: Point(9,2), 18: Point(9,3)
+	11: Point(3,2), 12: Point(3,3), 13: Point(3,4), 14: Point(3,5), 
+	15: Point(5,2), 16: Point(5,3), 17: Point(5,4), 18: Point(5,5),
+	19: Point(7,2), 20: Point(7,3), 21: Point(7,4), 22: Point(7,5), 
+	23: Point(9,2), 24: Point(9,3), 25: Point(9,4), 26: Point(9,5),
 ];
 
 struct Pod {
 	char type;
 	int pos;
+
+	this(char type, int pos) {
+		assert(['A', 'B', 'C', 'D'].canFind(type), "Wrong type " ~ type);
+		this.type = type;
+		this.pos = pos;
+	}
 }
 
 struct Move {
@@ -143,7 +165,7 @@ struct Move {
 }
 
 struct State {
-	Pod[8] pods;
+	Pod[16] pods;
 }
 
 void sortPods(ref State state) {
@@ -162,19 +184,22 @@ bool isEndCondition(State state) {
 
 bool targetRoomMismatch(State state, int type) {
 	foreach(p; state.pods) {
+		// for all the pods that are in a room
 		if (p.pos !in hallTarget) continue;
-		if (hallTarget[p.pos] == type) {
-			if (p.type != type) return false;
-		}
+		// for all the pods that are in the room of the target type
+		if (hallTarget[p.pos] != type) continue;
+		
+		// is that pod of the right type?
+		if (p.type != type) return false;
 	}
 	return true;
 }
 
 enum int[][char] heuristicData = [
-	'A': [ 3, 2, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 0, 4, 5, 6, 7, 8, 9 ],
-	'B': [ 5, 4, 3, 2, 1, 2, 3, 4, 5, 6, 7, 4, 5, 0, 0, 4, 5, 6, 7 ],
-	'C': [ 7, 6, 5, 4, 3, 2, 1, 2, 3, 4, 5, 6, 7, 4, 5, 0, 0, 4, 5 ],
-	'D': [ 9, 8, 7, 6, 5, 4, 3, 2, 1, 2, 3, 8, 9, 6, 7, 4, 5, 0, 0 ]
+	'A': [ 3, 2, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 0, 0, 0, 4, 5, 6, 7, 6, 7, 8, 9, 8, 9,10,11 ],
+	'B': [ 5, 4, 3, 2, 1, 2, 3, 4, 5, 6, 7, 4, 5, 6, 7, 0, 0, 0, 0, 4, 5, 6, 7, 6, 7, 8, 9 ],
+	'C': [ 7, 6, 5, 4, 3, 2, 1, 2, 3, 4, 5, 6, 7, 8, 9, 4, 5, 6, 7, 0, 0, 0, 0, 4, 5, 6, 7 ],
+	'D': [ 9, 8, 7, 6, 5, 4, 3, 2, 1, 2, 3, 8, 9,10,11, 6, 7, 8, 9, 4, 5, 6, 7, 0, 0, 0, 0 ]
 ];
 
 // calculate cost of putting everyting in its right state...
@@ -274,7 +299,7 @@ auto solve (string fname) {
 		pods ~= Pod(grid.get(v), hallPos);
 		grid.set(v, '.');
 	}
-	State state = State(to!(Pod[8])(pods));
+	State state = State(to!(Pod[16])(pods));
 	writefln("State: %s", state);
 	sortPods(state);
 	writefln("State: %s", state);
@@ -282,8 +307,10 @@ auto solve (string fname) {
 
 	// checkMoves(state);
 	State goal = State([
-		Pod('A', 11), Pod('A', 12), Pod('B', 13), Pod('B', 14), 
-		Pod('C', 15), Pod('C', 16), Pod('D', 17), Pod('D', 18)
+		Pod('A', 11), Pod('A', 12), Pod('A', 13), Pod('A', 14), 
+		Pod('B', 15), Pod('B', 16), Pod('B', 17), Pod('B', 18),
+		Pod('C', 19), Pod('C', 20), Pod('C', 21), Pod('C', 22), 
+		Pod('D', 23), Pod('D', 24), Pod('D', 25), Pod('D', 26),
 	]);
 	assert(goal.isEndCondition);
 
@@ -305,40 +332,8 @@ auto solve (string fname) {
 	return [ dijkstraResult[goal].cost ];
 }
 
-void test() {
-	auto dist = [1:50, 2:40, 3:30, 4:20, 5:10];
-	auto heap = heapify!((a,b) => dist[a] > dist[b])([3]);
-
-	assert(heap.dup.canFind(5) == false);
-	
-	assert(heap.front == 3);
-	heap.insert(4);
-	assert(heap.front == 4);
-	heap.insert(2);
-	assert(heap.front == 4);
-	heap.insert(1);
-	assert(heap.front == 4);
-	heap.insert(5);
-	assert(heap.front == 5);
-
-	assert(heap.dup.canFind(5) == true);
-
-	heap.popFront;
-	// writeln(heap);
-	assert(heap.front == 4);
-	heap.popFront;
-	assert(heap.front == 3);
-	heap.popFront;
-	assert(heap.front == 2);
-	writeln(heap);
-
-	int[4] ints = [2, 3, 1, 0];
-	sort(ints[]);
-	assert(ints == [0, 1, 2, 3]);
-}
-
 void main() {
-	test();
-	assert (solve("test") == [ 12521 ]);
+	// writeln(solve("test"));
+	assert (solve("test") == [ 44169 ]);
 	writeln (solve("input"));
 }
