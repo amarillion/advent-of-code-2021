@@ -22,9 +22,7 @@ struct Step(N, E) {
 	int cost;
 }
 
-alias DijkstraResult(N, E) = Step!(N,E)[N];
-
-auto dijkstra(N, E)(
+auto astar(N, E)(
 	N source, 
 	N dest, 
 	Tuple!(E, N)[] delegate(N) getAdjacent, 
@@ -34,11 +32,9 @@ auto dijkstra(N, E)(
 ) {
 	int[N] dist = [ source: 0 ];
 	int[N] priority = [ source: 0 ];
-	bool[N] visited;
 	Step!(N, E)[N] prev;
-	N goal;
-	
-	// TODO: more efficient to use a priority queue here
+
+	// priority queue	
 	auto open = heapify!((a, b) => priority[a] > priority[b])([ source ]);
 
 	int i = maxIterations;
@@ -63,33 +59,18 @@ auto dijkstra(N, E)(
 			}
 		}
 
-		// A visited node will never be checked again.
-		visited[current] = true;
-
 		if (current == dest) {
 			break;	
 		}
 
 		i--; // 0 -> -1 means Infinite.
 		if (i == 0) break;
-
-		if (i % 10000 == 0) { writeln(i, " ", open.length); }
+		if (i % 10000 == 0) { writeln(-i, " ", open.length); }
 	}
 
 	return prev;
 }
 
-/*
-#############
-#...........#
-###D#D#B#A###
-  #B#C#A#C#
-  #########
-*/
-
-enum bool[int] hallDisallowed = [
-	2: true, 4: true, 6: true, 8: true
-];
 enum char[int] hallTarget = [
 	11: 'A',
 	12: 'A',
@@ -213,42 +194,40 @@ int heuristic(State state) {
 
 Edge[] validMoves(State state) {
 	Edge[] result;
+	// create a position map
+	char[int] occupancy;
+	foreach (Pod p; state.pods) {
+		occupancy[p.pos] = p.type;
+	}
+
 	foreach (int ii, Pod p; state.pods) {
-		
-		bool isEmpty(int l) {
-			foreach(Pod q; state.pods) {
-				if (q.pos == l) return false;
-			}
-			return true;
-		}
 
 		Tuple!(int, int)[] adjFunc(int i) {
-			return hallAdj[i].filter!(j => isEmpty(j)).map!(i => tuple(0, i)).array;
+			return hallAdj[i].filter!(j => j !in occupancy).map!(i => tuple(0, i)).array;
 		}
 		
 		// calculate cost for all Edges where this can go...
-		auto dijk = dijkstra!(int, int)(p.pos, -1, &adjFunc, (Tuple!(int,int)) => podCosts[p.type]);
+		auto astarResult = astar!(int, int)(p.pos, -1, &adjFunc, (Tuple!(int,int)) => podCosts[p.type]);
 
-		foreach(dest; dijk.keys) {
+		foreach(dest; astarResult.keys) {
 			State newState = state;
 			newState.pods[ii] = Pod(p.type, dest);
-			// newState.moves = state.moves + 1;
 			sortPods(newState);
 
-			bool valid = true;
-			// never stop on space immediately outside room
-			if (dest in hallDisallowed) valid = false;
+			// never stop on t-section
+			if (hallAdj[dest].length == 3) continue;
 			// don't move within hallway
-			if (p.pos <= 10 && dest <= 10) valid = false;
+			if (p.pos <= 10 && dest <= 10) continue;
 			// don't move to room unless it's the destination
-			if (dest >= 11 && hallTarget[dest] != p.type) valid = false;
-			// don't move within a room (NOTE: stricter than needed)
-			if (p.pos >= 11 && dest >= 11 && hallTarget[p.pos] == hallTarget[dest]) valid = false;
-			// extra condition: destination must not be occupied by mismatches
-			if (dest >= 11 && !targetRoomMismatch(newState, p.type)) valid = false;
-			if (!valid) continue;
-
-			int cost = dijk[dest].cost;
+			if (dest >= 11 && hallTarget[dest] != p.type) continue;
+			// destination must not contain mismatches.
+			if (dest >= 11 && !targetRoomMismatch(newState, p.type)) continue;
+			// EXTRA CONDITION to reduce search space: don't move within a room
+			if (p.pos >= 11 && dest >= 11 && hallTarget[p.pos] == hallTarget[dest]) continue;
+			// EXTRA CONDITION to reduce search space: if we're in a room, check that the next spot isn't empty
+			if (dest >= 11 && ((dest-11) % 4 < 3) && ((dest + 1) !in occupancy)) continue;
+			
+			int cost = astarResult[dest].cost;
 			result ~= tuple(Move(cost, p, dest), newState);
 		}
 	}
@@ -300,11 +279,8 @@ auto solve (string fname) {
 		grid.set(v, '.');
 	}
 	State state = State(to!(Pod[16])(pods));
-	writefln("State: %s", state);
 	sortPods(state);
-	writefln("State: %s", state);
-	int minCost = int.max;
-
+	
 	// checkMoves(state);
 	State goal = State([
 		Pod('A', 11), Pod('A', 12), Pod('A', 13), Pod('A', 14), 
@@ -314,7 +290,7 @@ auto solve (string fname) {
 	]);
 	assert(goal.isEndCondition);
 
-	auto dijkstraResult = dijkstra!(State, Move)(
+	auto astarResult = astar!(State, Move)(
 		state, 
 		goal, 
 		s => s.validMoves, 
@@ -322,18 +298,11 @@ auto solve (string fname) {
 		s => s.heuristic
 	);
 	auto current = goal;
-	assert(current in dijkstraResult);
-	while (current in dijkstraResult) {
-		auto step = dijkstraResult[current];
-		writeln(step);
-		current = step.src;
-	}
-
-	return [ dijkstraResult[goal].cost ];
+	assert(current in astarResult);
+	return [ astarResult[goal].cost ];
 }
 
 void main() {
-	// writeln(solve("test"));
 	assert (solve("test") == [ 44169 ]);
 	writeln (solve("input"));
 }
