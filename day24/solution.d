@@ -1,4 +1,4 @@
-#!/usr/bin/env -S rdmd -g -I..
+#!/usr/bin/env -S rdmd -O -I..
 
 import common.io;
 import std.stdio;
@@ -285,24 +285,56 @@ class Parser {
 		}
 	}
 }
-
 auto solve (string fname) {
 	string[] lines = readLines(fname);
 
-	int[14] pinned =[1,0,0,0,0,0,0,0,0,0,0,0,0,0];
 	int pos = 0;
+
+	int[14] part1, part2;
+	
+	int[14] pinned =[9,0,0,0,0,0,0,0,0,0,0,0,0,0];
+	while(true) {
+		auto p = new Parser();
+		p.parse(lines, pinned);
+		Node z = p.variables["z"];
+
+		long[] possibleVals = z.possibleVals;
+		if (possibleVals[0] == 0) {
+			// potential match!
+			pos++;
+			if (pos >= pinned.length) {
+				part1 = pinned;
+				break;
+			}
+			pinned[pos] = 9;
+		}
+		else {
+			// not a match
+			pinned[pos]--;
+			while (pinned[pos] == 0) {
+				// backtrack!
+				pos--;
+				pinned[pos]--;
+			}
+		}
+	}
+
+	pinned =[1,0,0,0,0,0,0,0,0,0,0,0,0,0];
+	pos = 0;
 
 	while(true) {
 		auto p = new Parser();
 		p.parse(lines, pinned);
-		string k = "z";
-		Node z = p.variables[k];
-		sort(z.possibleVals);
-		writefln("%s -> %s", pinned, z.possibleVals[0]);
-		if (z.possibleVals[0] == 0) {
+		Node z = p.variables["z"];
+
+		long[] possibleVals = z.possibleVals;
+		if (possibleVals[0] == 0) {
 			// potential match!
 			pos++;
-			if (pos >= pinned.length) break;
+			if (pos >= pinned.length) {
+				part2 = pinned;
+				break;
+			}
 			pinned[pos] = 1;
 		}
 		else {
@@ -316,7 +348,7 @@ auto solve (string fname) {
 			}
 		}
 	}
-
+	return [ part1[].map!(to!string).join, part2[].map!(to!string).join ];
 }
 
 void printDeduplicated(string var, Node root) {
@@ -362,5 +394,5 @@ void printDeduplicated(string var, Node root) {
 }
 
 void main() {
-	solve("input");
+	writeln(solve("input"));
 }
